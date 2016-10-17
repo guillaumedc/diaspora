@@ -11,7 +11,7 @@ function createUploader(){
        action: "/photos",
        debug: false,
        button: document.getElementById('file-upload-publisher'),
-       sizeLimit: 4194304,
+       sizeLimit: 15728640,
 
        onProgress: function(id, fileName, loaded, total){
         var progress = Math.round(loaded / total * 100 );
