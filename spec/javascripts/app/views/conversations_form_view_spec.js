@@ -1,9 +1,133 @@
 describe("app.views.ConversationsForm", function() {
+  beforeEach(function() {
+    spec.loadFixture("conversations_read");
+    this.target = new app.views.ConversationsForm();
+  });
+
+  describe("initialize", function() {
+    it("initializes the conversation participants list", function() {
+      expect(this.target.conversationRecipients).toEqual([]);
+    });
+
+    it("initializes the search view", function() {
+      spyOn(app.views.SearchBase.prototype, "initialize");
+      this.target.initialize();
+      expect(app.views.SearchBase.prototype.initialize).toHaveBeenCalled();
+      expect(app.views.SearchBase.prototype.initialize.calls.argsFor(0)[0].customSearch).toBe(true);
+      expect(app.views.SearchBase.prototype.initialize.calls.argsFor(0)[0].autoselect).toBe(true);
+      expect(app.views.SearchBase.prototype.initialize.calls.argsFor(0)[0].remoteRoute).toEqual({
+        url: "/contacts",
+        extraParameters: "mutual=true"
+      });
+      expect(this.target.search).toBeDefined();
+    });
+
+    it("calls bindTypeaheadEvents", function() {
+      spyOn(app.views.ConversationsForm.prototype, "bindTypeaheadEvents");
+      this.target.initialize();
+      expect(app.views.ConversationsForm.prototype.bindTypeaheadEvents).toHaveBeenCalled();
+    });
+
+    it("calls prefill correctly", function() {
+      spyOn(app.views.ConversationsForm.prototype, "prefill");
+      this.target.initialize();
+      expect(app.views.ConversationsForm.prototype.prefill).not.toHaveBeenCalled();
+      this.target.initialize({prefill: {}});
+      expect(app.views.ConversationsForm.prototype.prefill).toHaveBeenCalledWith({});
+    });
+  });
+
+  describe("addRecipient", function() {
+    beforeEach(function() {
+      $("#conversation-new").removeClass("hidden");
+      $("#conversation-show").addClass("hidden");
+    });
+
+    it("adds the participant", function() {
+      expect(this.target.conversationRecipients).toEqual([]);
+      this.target.addRecipient({name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      expect(this.target.conversationRecipients).toEqual([{name: "diaspora user", handle: "diaspora-user@pod.tld"}]);
+    });
+
+    it("calls updateContactIdsListInput", function() {
+      spyOn(app.views.ConversationsForm.prototype, "updateContactIdsListInput");
+      this.target.addRecipient({name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      expect(app.views.ConversationsForm.prototype.updateContactIdsListInput).toHaveBeenCalled();
+    });
+
+    it("adds a recipient tag", function() {
+      expect($(".conversation-recipient-tag").length).toBe(0);
+      this.target.addRecipient({name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      expect($(".conversation-recipient-tag").length).toBe(1);
+    });
+  });
+
+  describe("prefill", function() {
+    beforeEach(function() {
+      this.prefills = [{name: "diaspora user"}, {name: "other diaspora user"}, {name: "user"}];
+    });
+
+    it("calls addRecipient for each prefilled participant", function() {
+      spyOn(app.views.ConversationsForm.prototype, "addRecipient");
+      this.target.prefill(this.prefills);
+      expect(app.views.ConversationsForm.prototype.addRecipient).toHaveBeenCalledTimes(this.prefills.length);
+      var allArgsFlattened = app.views.ConversationsForm.prototype.addRecipient.calls.allArgs().map(function(arg) {
+        return arg[0];
+      });
+      expect(allArgsFlattened).toEqual(this.prefills);
+    });
+  });
+
+  describe("updateContactIdsListInput", function() {
+    beforeEach(function() {
+      this.target.conversationRecipients.push({id: 1, name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      this.target.conversationRecipients
+        .push({id: 2, name: "other diaspora user", handle: "other-diaspora-user@pod.tld"});
+      this.target.conversationRecipients.push({id: 3, name: "user@pod.tld", handle: "user@pod.tld"});
+    });
+
+    it("updates hidden input value", function() {
+      this.target.updateContactIdsListInput();
+      expect(this.target.contactsIdsListInput.val()).toBe("1,2,3");
+    });
+
+    it("calls app.views.SearchBase.ignorePersonForSuggestions() for each participant", function() {
+      spyOn(app.views.SearchBase.prototype, "ignorePersonForSuggestions");
+      this.target.updateContactIdsListInput();
+      expect(app.views.SearchBase.prototype.ignorePersonForSuggestions).toHaveBeenCalledTimes(3);
+      expect(app.views.SearchBase.prototype.ignorePersonForSuggestions.calls.argsFor(0)[0])
+        .toEqual({id: 1, name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      expect(app.views.SearchBase.prototype.ignorePersonForSuggestions.calls.argsFor(1)[0])
+        .toEqual({id: 2, name: "other diaspora user", handle: "other-diaspora-user@pod.tld"});
+      expect(app.views.SearchBase.prototype.ignorePersonForSuggestions.calls.argsFor(2)[0])
+        .toEqual({id: 3, name: "user@pod.tld", handle: "user@pod.tld"});
+    });
+  });
+
+  describe("bindTypeaheadEvents", function() {
+    it("calls onSuggestionSelection() when clicking on a result", function() {
+      spyOn(app.views.ConversationsForm.prototype, "onSuggestionSelection");
+      var event = $.Event("typeahead:select");
+      var person = {name: "diaspora user"};
+      this.target.typeaheadElement.trigger(event, [person]);
+      expect(app.views.ConversationsForm.prototype.onSuggestionSelection).toHaveBeenCalledWith(person);
+    });
+  });
+
+  describe("onSuggestionSelection", function() {
+    it("calls addRecipient and $.fn.typeahead", function() {
+      spyOn(app.views.ConversationsForm.prototype, "addRecipient");
+      spyOn($.fn, "typeahead");
+      var person = {name: "diaspora user"};
+      this.target.onSuggestionSelection(person);
+      expect(app.views.ConversationsForm.prototype.addRecipient).toHaveBeenCalledWith(person);
+      expect($.fn.typeahead).toHaveBeenCalledWith("val", "");
+    });
+  });
+
   describe("keyDown", function() {
     beforeEach(function() {
       this.submitCallback = jasmine.createSpy().and.returnValue(false);
-      spec.loadFixture("conversations_read");
-      new app.views.ConversationsForm();
     });
 
     context("on new message form", function() {
@@ -49,62 +173,102 @@ describe("app.views.ConversationsForm", function() {
     });
   });
 
-  describe("onSubmitNewConversation", function() {
+  describe("removeRecipient", function() {
     beforeEach(function() {
-      spec.loadFixture("conversations_read");
-      $("#conversation-new").removeClass("hidden");
-      $("#conversation-show").addClass("hidden");
-      spyOn(app.views.ConversationsForm.prototype, "onSubmitNewConversation").and.callThrough();
-      this.target = new app.views.ConversationsForm();
+      this.target.addRecipient({id: 1, name: "diaspora user", handle: "diaspora-user@pod.tld"});
+      this.target.addRecipient({id: 2, name: "other diaspora user", handle: "other-diaspora-user@pod.tld"});
+      this.target.addRecipient({id: 3, name: "user@pod.tld", handle: "user@pod.tld"});
     });
 
-    it("onSubmitNewConversation is called when submitting the conversation form", function() {
-      spyOn(app.views.ConversationsForm.prototype, "getConversationParticipants").and.returnValue([]);
-      $("#conversation-new").trigger("submit");
+    it("removes the user from conversation recipients when clicking the tag's remove button", function() {
+      expect(this.target.conversationRecipients).toEqual([
+        {id: 1, name: "diaspora user", handle: "diaspora-user@pod.tld"},
+        {id: 2, name: "other diaspora user", handle: "other-diaspora-user@pod.tld"},
+        {id: 3, name: "user@pod.tld", handle: "user@pod.tld"}
+      ]);
 
-      expect(app.views.ConversationsForm.prototype.onSubmitNewConversation).toHaveBeenCalled();
+      $("[data-diaspora-handle='diaspora-user@pod.tld'] .remove").click();
+
+      expect(this.target.conversationRecipients).toEqual([
+        {id: 2, name: "other diaspora user", handle: "other-diaspora-user@pod.tld"},
+        {id: 3, name: "user@pod.tld", handle: "user@pod.tld"}
+      ]);
+
+      $("[data-diaspora-handle='other-diaspora-user@pod.tld'] .remove").click();
+
+      expect(this.target.conversationRecipients).toEqual([
+        {id: 3, name: "user@pod.tld", handle: "user@pod.tld"}
+      ]);
+
+      $("[data-diaspora-handle='user@pod.tld'] .remove").click();
+
+      expect(this.target.conversationRecipients).toEqual([]);
     });
 
-    it("does not submit a conversation with no recipient", function() {
-      spyOn(app.views.ConversationsForm.prototype, "getConversationParticipants").and.returnValue([]);
-      var event = jasmine.createSpyObj("event", ["preventDefault", "stopPropagation"]);
+    it("removes the tag element when clicking the tag's remove button", function() {
+      expect($("[data-diaspora-handle='diaspora-user@pod.tld']").length).toBe(1);
+      $("[data-diaspora-handle='diaspora-user@pod.tld'] .remove").click();
+      expect($("[data-diaspora-handle='diaspora-user@pod.tld']").length).toBe(0);
 
-      this.target.onSubmitNewConversation(event);
+      expect($("[data-diaspora-handle='other-diaspora-user@pod.tld']").length).toBe(1);
+      $("[data-diaspora-handle='other-diaspora-user@pod.tld'] .remove").click();
+      expect($("[data-diaspora-handle='other-diaspora-user@pod.tld']").length).toBe(0);
 
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(event.stopPropagation).toHaveBeenCalled();
+      expect($("[data-diaspora-handle='user@pod.tld']").length).toBe(1);
+      $("[data-diaspora-handle='user@pod.tld'] .remove").click();
+      expect($("[data-diaspora-handle='user@pod.tld']").length).toBe(0);
     });
 
-    it("submits a conversation with recipients", function() {
-      spyOn(app.views.ConversationsForm.prototype, "getConversationParticipants").and.returnValue([1]);
-      var event = jasmine.createSpyObj("event", ["preventDefault", "stopPropagation"]);
+    it("calls updateContactIdsListInput", function() {
+      spyOn(app.views.ConversationsForm.prototype, "updateContactIdsListInput");
+      $("[data-diaspora-handle='diaspora-user@pod.tld'] .remove").click();
+      expect(app.views.ConversationsForm.prototype.updateContactIdsListInput).toHaveBeenCalled();
+    });
+  });
 
-      this.target.onSubmitNewConversation(event);
+  describe("conversationCreateSuccess", function() {
+    it("is called when there was a successful ajax request for the conversation form", function() {
+      spyOn(app.views.ConversationsForm.prototype, "conversationCreateSuccess");
+      this.view = new app.views.ConversationsForm();
 
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(event.stopPropagation).not.toHaveBeenCalled();
+      $("#conversation-show").trigger("ajax:success", [{id: 23}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateSuccess).not.toHaveBeenCalled();
+
+      $("#new-conversation").trigger("ajax:error", [{responseText: "error"}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateSuccess).not.toHaveBeenCalled();
+
+      $("#new-conversation").trigger("ajax:success", [{id: 23}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateSuccess).toHaveBeenCalled();
     });
 
-    it("flashes an error message when submitting a conversation with no recipient", function() {
-      spyOn(app.views.FlashMessages.prototype, "error");
-      spyOn(app.views.ConversationsForm.prototype, "getConversationParticipants").and.returnValue([]);
-      var event = jasmine.createSpyObj("event", ["preventDefault", "stopPropagation"]);
+    it("redirects to the new conversation", function() {
+      spyOn(app, "_changeLocation");
+      this.view = new app.views.ConversationsForm();
+      $("#new-conversation").trigger("ajax:success", [{id: 23}]);
+      expect(app._changeLocation).toHaveBeenCalledWith(Routes.conversation(23));
+    });
+  });
 
-      this.target.onSubmitNewConversation(event);
+  describe("conversationCreateError", function() {
+    it("is called when an ajax request failed for the conversation form", function() {
+      spyOn(app.views.ConversationsForm.prototype, "conversationCreateError");
+      this.view = new app.views.ConversationsForm();
 
-      expect(app.views.FlashMessages.prototype.error)
-        .toHaveBeenCalledWith(Diaspora.I18n.t("conversation.create.no_recipient"));
+      $("#conversation-show").trigger("ajax:error", [{responseText: "error"}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateError).not.toHaveBeenCalled();
+
+      $("#new-conversation").trigger("ajax:success", [{id: 23}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateError).not.toHaveBeenCalled();
+
+      $("#new-conversation").trigger("ajax:error", [{responseText: "error"}]);
+      expect(app.views.ConversationsForm.prototype.conversationCreateError).toHaveBeenCalled();
     });
 
-    it("does not flash an error message when submitting a conversation with recipients", function() {
-      spyOn(app.views.FlashMessages.prototype, "error");
-      spyOn(app.views.ConversationsForm.prototype, "getConversationParticipants").and.returnValue([1]);
-      var event = jasmine.createSpyObj("event", ["preventDefault", "stopPropagation"]);
-
-      this.target.onSubmitNewConversation(event);
-
-      expect(app.views.FlashMessages.prototype.error).not
-        .toHaveBeenCalledWith(Diaspora.I18n.t("conversation.create.no_recipient"));
+    it("shows a flash message", function() {
+      spyOn(app.flashMessages, "error");
+      this.view = new app.views.ConversationsForm();
+      $("#new-conversation").trigger("ajax:error", [{responseText: "Oh noez! Something went wrong!"}]);
+      expect(app.flashMessages.error).toHaveBeenCalledWith("Oh noez! Something went wrong!");
     });
   });
 });

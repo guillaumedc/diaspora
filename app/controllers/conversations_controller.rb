@@ -30,12 +30,12 @@ class ConversationsController < ApplicationController
   end
 
   def create
-    contact_ids = params[:contact_ids]
-
-    # Can't split nil
-    if contact_ids
-      contact_ids = contact_ids.split(',') if contact_ids.is_a? String
-      person_ids = current_user.contacts.where(id: contact_ids).pluck(:person_id)
+    # Contacts autocomplete does not work the same way on mobile and desktop
+    # Mobile returns contact ids array while desktop returns person id
+    # This will have to be removed when mobile autocomplete is ported to Typeahead
+    recipients_param, column = [%i(contact_ids id), %i(person_ids person_id)].find {|param, _| params[param].present? }
+    if recipients_param
+      person_ids = current_user.contacts.mutual.where(column => params[recipients_param].split(",")).pluck(:person_id)
     end
 
     opts = params.require(:conversation).permit(:subject)
@@ -43,21 +43,16 @@ class ConversationsController < ApplicationController
     opts[:message] = { text: params[:conversation][:text] }
     @conversation = current_user.build_conversation(opts)
 
-    @response = {}
     if person_ids.present? && @conversation.save
       Diaspora::Federation::Dispatcher.defer_dispatch(current_user, @conversation)
-      @response[:success] = true
-      @response[:message] = I18n.t('conversations.create.sent')
-      @response[:conversation_id] = @conversation.id
+      flash[:notice] = I18n.t("conversations.create.sent")
+      render json: {id: @conversation.id}
     else
-      @response[:success] = false
-      @response[:message] = I18n.t('conversations.create.fail')
+      message = I18n.t("conversations.create.fail")
       if person_ids.blank?
-        @response[:message] = I18n.t("javascripts.conversation.create.no_recipient")
+        message = I18n.t("javascripts.conversation.create.no_recipient")
       end
-    end
-    respond_to do |format|
-      format.js
+      render text: message, status: 422
     end
   end
 
@@ -96,17 +91,23 @@ class ConversationsController < ApplicationController
       return
     end
 
-    @contacts_json = contacts_data.to_json
-    @contact_ids = ""
-
-    if params[:contact_id]
-      @contact_ids = current_user.contacts.find(params[:contact_id]).id
-    elsif params[:aspect_id]
-      @contact_ids = current_user.aspects.find(params[:aspect_id]).contacts.map{|c| c.id}.join(',')
-    end
     if session[:mobile_view] == true && request.format.html?
+      @contacts_json = contacts_data.to_json
+
+      @contact_ids = if params[:contact_id]
+                       current_user.contacts.find(params[:contact_id]).id
+                     elsif params[:aspect_id]
+                       current_user.aspects.find(params[:aspect_id]).contacts.pluck(:id).join(",")
+                     end
+
       render :layout => true
     else
+      if params[:contact_id]
+        gon.push conversation_prefill: [current_user.contacts.find(params[:contact_id]).person.as_json]
+      elsif params[:aspect_id]
+        gon.push conversation_prefill: current_user.aspects
+                                                   .find(params[:aspect_id]).contacts.map {|c| c.person.as_json }
+      end
       render :layout => false
     end
   end

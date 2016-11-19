@@ -2,6 +2,7 @@ app.views.SearchBase = app.views.Base.extend({
   initialize: function(options) {
     this.ignoreDiasporaIds = [];
     this.typeaheadInput = options.typeaheadInput;
+    this.suggestionLink = options.suggestionLink || false;
     this.setupBloodhound(options);
     if(options.customSearch) { this.setupCustomSearch(); }
     this.setupTypeahead();
@@ -27,11 +28,15 @@ app.views.SearchBase = app.views.Base.extend({
     };
 
     // Allow bloodhound to look for remote results if there is a route given in the options
-    if(options.remoteRoute) {
+    if (options.remoteRoute && options.remoteRoute.url) {
+      var extraParameters = "";
+      if (options.remoteRoute.extraParameters) {
+        extraParameters += "&" + options.remoteRoute.extraParameters;
+      }
       bloodhoundOptions.remote = {
-        url: options.remoteRoute + ".json?q=%QUERY",
+        url: options.remoteRoute.url + ".json?q=%QUERY" + extraParameters,
         wildcard: "%QUERY",
-        transform: this.transformBloodhoundResponse
+        transform: this.transformBloodhoundResponse.bind(this)
       };
     }
 
@@ -75,6 +80,7 @@ app.views.SearchBase = app.views.Base.extend({
       // person
       if(data.handle) {
         data.person = true;
+        data.link = this.suggestionLink;
         return data;
       }
 
@@ -84,7 +90,7 @@ app.views.SearchBase = app.views.Base.extend({
         name: data.name,
         url: Routes.tag(data.name.substring(1))
       };
-    });
+    }.bind(this));
   },
 
   _deselectAllSuggestions: function() {
@@ -106,5 +112,5 @@ app.views.SearchBase = app.views.Base.extend({
 
   ignorePersonForSuggestions: function(person) {
     if(person.handle) { this.ignoreDiasporaIds.push(person.handle); }
-  },
+  }
 });

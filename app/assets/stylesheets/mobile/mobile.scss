@@ -118,7 +118,7 @@ textarea { resize: vertical; }
   color: rgb(10, 150, 10);
   text-shadow: 1px 1px 20px rgb(126, 240, 77); }
 
-#login_form {
+.login-form {
   /* ensure url bar is banished from view on iOS */
   margin-bottom: 40px !important;
 
@@ -144,13 +144,13 @@ footer {
   }
 }
 
-.settings_container,
+.settings-container,
 .stream-element,
-#login_form {
+.login-form {
   border-radius: 5px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 
-  background-color: #fff;
+  background-color: $framed-background;
   margin-bottom: 10px;
 
   border: 1px solid #bbb;
@@ -176,7 +176,7 @@ footer {
     border-radius: 3px 3px 0 0;
 
     border: {
-      bottom: 1px solid #ccc;
+      bottom: 1px solid $border-medium-grey;
     }
 
     img.big-stream-photo {
@@ -322,7 +322,7 @@ footer {
 }
 
 .header-full-width {
-  background-color: #fff;
+  background-color: $framed-background;
   border-bottom: 1px solid #aaa;
   margin: -10px; // Counter the #main padding
   margin-bottom: 10px;
@@ -462,7 +462,7 @@ select {
       font-weight: bold;
       color: $text-grey;
       background: {
-        color: #fff;
+        color: $framed-background;
       }
     }
   }
