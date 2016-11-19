@@ -14,7 +14,7 @@ Diaspora.ProfilePhotoUploader.prototype = {
       allowedExtensions: ["jpg", "jpeg", "png"],
       action: "/photos",
       button: document.getElementById("file-upload"),
-      sizeLimit: 4194304,
+      sizeLimit: 15728640,
 
       onProgress: function(id, fileName, loaded, total) {
         var progress = Math.round(loaded / total * 100);
